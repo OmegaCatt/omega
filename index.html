@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="cs">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FakturaTracker</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Chart.js -->
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Tesseract.js & PDF.js -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div id="login-screen" class="login-screen">
+        <div class="login-card">
+            <div class="logo">
+                <i data-lucide="wallet"></i>
+                <span>Tracker</span>
+            </div>
+
+            <!-- Login View -->
+            <div id="auth-login">
+                <h2>Vítejte zpět</h2>
+                <p>Přihlaste se ke svému účtu</p>
+                <form id="login-form" class="login-form">
+                    <div class="form-group">
+                        <label>Přihlašovací jméno</label>
+                        <input type="text" id="login-username" placeholder="Uživatelské jméno" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Heslo</label>
+                        <input type="password" id="login-password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-primary btn-login">Přihlásit se</button>
+                    <div id="login-error" class="login-error auth-error"></div>
+                </form>
+                <p class="auth-toggle">Nemáte účet? <a href="#" onclick="toggleAuthMode('register')">Vytvořit účet</a>
+                </p>
+            </div>
+
+            <!-- Register View -->
+            <div id="auth-register" class="hidden">
+                <h2>Vytvořit účet</h2>
+                <p>Zaregistrujte se a začněte sledovat výdaje</p>
+                <form id="register-form" class="login-form">
+                    <div class="form-group">
+                        <label>Přihlašovací jméno</label>
+                        <input type="text" id="register-username" placeholder="Nové uživatelské jméno" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Heslo</label>
+                        <input type="password" id="register-password" placeholder="••••••••" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Heslo znovu</label>
+                        <input type="password" id="register-confirm-password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-primary btn-login">Zaregistrovat se</button>
+                    <div id="register-error" class="login-error auth-error"></div>
+                </form>
+                <p class="auth-toggle">Již máte účet? <a href="#" onclick="toggleAuthMode('login')">Přihlásit se</a></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container hidden">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i data-lucide="wallet"></i>
+                <span>Tracker</span>
+            </div>
+
+            <ul class="nav-links">
+                <li class="active" onclick="switchView('dashboard')" data-view="dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Přehled</span>
+                </li>
+                <li onclick="switchView('invoices')" data-view="invoices">
+                    <i data-lucide="file-text"></i>
+                    <span>Faktury</span>
+                </li>
+                <li onclick="switchView('subscriptions')" data-view="subscriptions">
+                    <i data-lucide="calendar-clock"></i>
+                    <span>Pravidelné</span>
+                </li>
+            </ul>
+
+            <div class="user-profile">
+                <div class="avatar">O</div>
+                <div class="user-info">
+                    <span class="name" id="user-display-name">omega</span>
+                    <span class="role" id="user-role">Admin</span>
+                </div>
+                <button class="btn-theme-toggle" onclick="toggleTheme()" title="Přepnout motiv"
+                    style="margin-left: auto; background: none; border: none; cursor: pointer; color: var(--text-muted);">
+                    <i data-lucide="moon" style="width: 18px; height: 18px;" id="theme-icon"></i>
+                </button>
+                <button class="btn-logout" onclick="handleLogout()" title="Odhlásit se"
+                    style="margin-left: 8px; background: none; border: none; cursor: pointer; color: var(--text-muted);">
+                    <i data-lucide="log-out" style="width: 18px; height: 18px;"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar">
+                <h1>Můj Přehled</h1>
+                <div class="header-actions" style="display: flex; gap: 12px;">
+                    <button class="btn-primary" id="btn-export-csv" onclick="exportToCSV()" style="background-color: var(--success-color);" title="Exportovat do CSV">
+                        <i data-lucide="download"></i> Export CSV
+                    </button>
+                    <button class="btn-primary" id="btn-new-invoice" onclick="openModal()">
+                        <i data-lucide="plus"></i> Nová faktura
+                    </button>
+                    <button class="btn-new-sub" id="btn-new-sub-header" onclick="openSubModal()" style="display: none;">
+                        <i data-lucide="plus-circle"></i> Nová platba
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view active">
+                <div class="stats-grid">
+                    <div class="card stat-card total-expense">
+                        <h3>Celkem výdaje (Rok)</h3>
+                        <div class="value" id="total-year">0 Kč</div>
+                        <div class="trend up">
+                            <i data-lucide="trending-up"></i> +12% vs loni
+                        </div>
+                    </div>
+                    <div class="card stat-card monthly-expense">
+                        <h3>Tento měsíc</h3>
+                        <div class="value" id="total-month">0 Kč</div>
+                    </div>
+                </div>
+
+                <div class="chart-section card">
+                    <h3>Výdaje v čase a podle kategorií</h3>
+                    <div class="charts-wrapper" style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
+                        <div class="chart-container" style="flex: 2; min-width: 300px; height: 300px;">
+                            <canvas id="expenseChart"></canvas>
+                        </div>
+                        <div class="chart-container" style="flex: 1; min-width: 250px; height: 300px; position: relative;">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-invoices card">
+                    <h3>Poslední faktury</h3>
+                    <ul class="invoice-list" id="recent-invoices-list">
+                        <!-- Items rendered by JS -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Invoices View (Hidden by default) -->
+            <div id="view-invoices" class="view" style="display: none;">
+                <div class="card">
+                    <h3>Seznam všech faktur</h3>
+                    <div class="filters">
+                        <div class="form-row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                            <input type="text" placeholder="Hledat..." id="search-input" style="flex: 1;">
+                            <select id="filter-category" style="flex: 1;">
+                                <option value="">Všechny kategorie</option>
+                                <option value="kancelar">Kancelář</option>
+                                <option value="sluzby">Služby</option>
+                                <option value="hardware">Hardware</option>
+                                <option value="ostatni">Ostatní</option>
+                            </select>
+                            <input type="month" id="filter-month" style="flex: 1;">
+                        </div>
+                    </div>
+                    <ul class="invoice-list full-list" id="all-invoices-list">
+                        <!-- Items rendered by JS -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Subscriptions View -->
+            <div id="view-subscriptions" class="view" style="display: none;">
+                <div class="card">
+                    <div class="header-with-action"
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <h3>Pravidelné platby</h3>
+                    </div>
+                    <ul class="invoice-list full-list" id="subscriptions-list">
+                        <!-- Items rendered by JS -->
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for New Invoice -->
+    <div class="modal-overlay" id="invoice-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Nová faktura</h2>
+                <button class="close-btn" onclick="closeModal()"><i data-lucide="x"></i></button>
+            </div>
+
+            <!-- Scan Section -->
+            <div class="scan-section">
+                <input type="file" id="invoice-file" accept=".jpg,.jpeg,.png,.pdf" style="display: none;">
+                <button type="button" class="btn-scan" onclick="document.getElementById('invoice-file').click()">
+                    <i data-lucide="scan-line"></i> Načíst z faktury (AI)
+                </button>
+                <div id="scan-status" class="scan-status"></div>
+            </div>
+
+            <form id="invoice-form">
+                <div class="form-group">
+                    <label>Částka (Kč)</label>
+                    <input type="number" id="amount" required placeholder="0" class="large-input">
+                </div>
+                <div class="form-group">
+                    <label>Název / Dodavatel</label>
+                    <input type="text" id="vendor" required placeholder="Např. O2 Internet">
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Datum vystavení</label>
+                        <input type="date" id="date" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Datum splatnosti</label>
+                        <input type="date" id="dueDate">
+                    </div>
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Číslo účtu</label>
+                        <input type="text" id="accountNumber" placeholder="123456/0100">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Variabilní symbol (VS)</label>
+                        <input type="text" id="vs" placeholder="2023001">
+                    </div>
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>IČO</label>
+                        <input type="text" id="ico" placeholder="12345678">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>DIČ</label>
+                        <input type="text" id="dic" placeholder="CZ12345678">
+                    </div>
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Způsob platby</label>
+                        <input type="text" id="paymentMethod" placeholder="Např. Platba kartou">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Číslo objednávky</label>
+                        <input type="text" id="orderNumber" placeholder="123456">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Interní číslo</label>
+                    <input type="text" id="internalNumber" placeholder="Např. ACS250...">
+                </div>
+
+                <div class="form-group">
+                    <label>Kategorie</label>
+                    <select id="category">
+                        <option value="kancelar">Kancelář</option>
+                        <option value="sluzby">Služby</option>
+                        <option value="hardware">Hardware</option>
+                        <option value="ostatni">Ostatní</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Zrušit</button>
+                    <button type="submit" class="btn-primary">Uložit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for New Subscription -->
+    <div class="modal-overlay" id="subscription-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Nová pravidelná platba</h2>
+                <button class="close-btn" onclick="closeSubModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="subscription-form">
+                <div class="form-group">
+                    <label>Název / Služba</label>
+                    <input type="text" id="sub-vendor" required placeholder="Např. Netflix">
+                </div>
+                <div class="form-group">
+                    <label>Částka (Kč)</label>
+                    <input type="number" id="sub-amount" required placeholder="0">
+                </div>
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Frekvence</label>
+                        <select id="sub-frequency">
+                            <option value="monthly">Měsíčně</option>
+                            <option value="yearly">Ročně</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Příští platba</label>
+                        <input type="date" id="sub-nextPayment" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Kategorie</label>
+                    <select id="sub-category">
+                        <option value="kancelar">Kancelář</option>
+                        <option value="sluzby">Služby</option>
+                        <option value="hardware">Hardware</option>
+                        <option value="ostatni">Ostatní</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeSubModal()">Zrušit</button>
+                    <button type="submit" class="btn-primary">Uložit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for Invoice Detail -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Detail faktury</h2>
+                <button class="close-btn" onclick="closeDetailModal()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="detail-content">
+                <div class="form-group">
+                    <label>Název / Dodavatel</label>
+                    <div id="detail-vendor" class="detail-value" style="font-weight: 600; font-size: 1.1em;">-</div>
+                </div>
+                <div class="form-group">
+                    <label>Částka</label>
+                    <div id="detail-amount" class="detail-value"
+                        style="font-size: 1.5em; color: var(--primary-color); font-weight: 700;">-</div>
+                </div>
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Datum vystavení</label>
+                        <div id="detail-date" class="detail-value">-</div>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Datum splatnosti</label>
+                        <div id="detail-dueDate" class="detail-value">-</div>
+                    </div>
+                </div>
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Variabilní symbol</label>
+                        <div id="detail-vs" class="detail-value">-</div>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Číslo účtu</label>
+                        <div id="detail-account" class="detail-value">-</div>
+                    </div>
+                </div>
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>IČO</label>
+                        <div id="detail-ico" class="detail-value">-</div>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>DIČ</label>
+                        <div id="detail-dic" class="detail-value">-</div>
+                    </div>
+                </div>
+                <div class="form-row" style="display: flex; gap: 16px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Způsob platby</label>
+                        <div id="detail-paymentMethod" class="detail-value">-</div>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Číslo objednávky</label>
+                        <div id="detail-orderNumber" class="detail-value">-</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Interní číslo</label>
+                    <div id="detail-internalNumber" class="detail-value">-</div>
+                </div>
+                <div class="form-group">
+                    <label>Kategorie</label>
+                    <div id="detail-category" class="detail-value">-</div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-secondary" onclick="closeDetailModal()">Zavřít</button>
+                <button type="button" class="btn-primary" id="btn-edit-invoice" onclick="editInvoiceFromDetail()" style="padding: 10px 20px;">Upravit</button>
+                <button type="button" class="btn-danger" id="btn-delete-invoice"
+                    style="background-color:fee2e2; color: #ef4444; border:none; padding: 10px 20px; border-radius: var(--radius); font-weight: 500; cursor: pointer;">Smazat</button>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
